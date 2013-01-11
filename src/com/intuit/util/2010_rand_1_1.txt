@@ -1,1 +1,0 @@
-s3n://aws-publicdatasets/common-crawl/crawl-002/2010/08/09/23/1281353379631_23.arc.gz
