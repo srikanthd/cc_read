@@ -14,7 +14,11 @@ import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
 
-
+/**
+ * Mapper class for processing the webpage as "Arcrecord"
+ * @author rgrandhi
+ *
+ */
 public class WebPageProcessorMapper
 extends    MapReduceBase
 implements Mapper<Text, ArcRecord, Text, Text> {
@@ -28,11 +32,12 @@ private final String _counterGroup = "Custom Mapper Counters";
 public void map(Text key, ArcRecord value, OutputCollector<Text, Text> output, Reporter reporter)
   throws IOException {
 
-	  int outindomcnt = 0;
+	    int outindomcnt = 0;
 	    int outsubdomcnt = 0;
+	    int totLinks = 0;
 	    int totoutboundcnt = 0;
 	    int jslinkscnt = 0;
-	    int indomaincnt = 0;
+	    int totinboundcnt = 0;
 	    String title = "";
 	    String h1 = "";
 	    String text = "";
@@ -48,7 +53,7 @@ try {
 
   System.out.println(value.getContentType());
   
-  // just curious how many of each content type we've seen
+  //content type of the file we've seen
   reporter.incrCounter(this._counterGroup, "Content Type - "+value.getContentType(), 1);
 
   // ensure sample instances have enough memory to parse HTML
@@ -57,7 +62,7 @@ try {
     return;
   }
 
-  // Count all 'itemtype' attributes referencing 'schema.org'
+  // Get the Document object of the parsed HTML using Jsoup parser.
   Document doc = value.getParsedHTML();
 
  
@@ -66,15 +71,17 @@ try {
     return;
   }
   
-  
+  //the page URL we are processing in the current step.
   String c_url = value.getURL();
   
+  //All link elements in the current web page.
   Elements links  = doc.select("a[href]"); 
  
-    totoutboundcnt  = links.size();
+  //total number of links present in the current webpage.
+  totLinks  = links.size();
     
-    String cwurlhost = getHost(c_url);
-    String cwurldom = getBaseDomain(c_url);
+  String cwurlhost = getHost(c_url);
+  String cwurldom = getBaseDomain(c_url);
     
     for(int k=0;k<links.size(); ++k)
     {
@@ -82,20 +89,31 @@ try {
     Element curLinkElem = links.get(k);
     String curLink	= curLinkElem.attr("href");
     
+    //If the link points to the same domain.
     if (curLink.contains(cwurlhost)) {
         outindomcnt++;
-    } else {
+    } 
+    else {
+    	
+    	// if the link points to another page in sub domain.
         if (getBaseDomain(curLink).equals(cwurldom)) {
             outsubdomcnt++;
         } else {
+        	
+        	//if the link contains relative paths or points to the same page.
             if (curLink.startsWith("/")
                     || curLink.startsWith("../")
                     || curLink.startsWith("#")) {
                 outindomcnt++;
+               
             } else if ((curLink.startsWith("http:"))
                     && (!curLink.contains(cwurlhost))) {
 
-            	String resLinkText = "1///0///0///0///0" ;
+            	//else the link points to external web page.
+            	totoutboundcnt++;
+            	
+            	//increment the count of "inbound" link from the current page to the external webpage.
+            	String resLinkText = "1///0///0///0///0///0" ;
             	
                 output.collect(new Text(curLink), new Text(resLinkText));
             } else if (curLink.startsWith(
@@ -108,7 +126,7 @@ try {
     }
     
     
-    String resText = indomaincnt + "///" + totoutboundcnt + "///"
+    String resText = totinboundcnt + "///" + totLinks + "///" + totoutboundcnt + "///"
             + outindomcnt + "///" + outsubdomcnt + "///"
             + jslinkscnt ;
 
@@ -128,7 +146,7 @@ catch (Throwable e) {
 }
 }
 
-
+//get the current host of a given URL
 public static String getHost(String url) {
     if (url == null || url.length() == 0) {
         return "";
@@ -149,6 +167,8 @@ public static String getHost(String url) {
     return url.substring(doubleslash, end);
 }
 
+
+//get the base domain of a given URL
 public static String getBaseDomain(String url) {
     String host = getHost(url);
 
