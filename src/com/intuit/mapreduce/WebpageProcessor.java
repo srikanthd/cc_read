@@ -131,6 +131,10 @@ public class WebpageProcessor
     
     //Set configuration parameters in the JobConf.
     job.setMaxMapTaskFailuresPercent(50);
+    job.setMaxMapAttempts(1);
+    job.setMaxReduceTaskFailuresPercent(50);
+    job.setMaxReduceAttempts(1);
+    
     long MAX_JOBCONF_SIZE = 10*1024*1024L;
     job.setLong(JobTracker.MAX_USER_JOBCONF_SIZE_KEY, MAX_JOBCONF_SIZE);
     
@@ -168,8 +172,8 @@ public class WebpageProcessor
     // Set the path where final output 'part' files will be saved.
     LOG.info("setting output path to '" + outputPath + "'");
     FileOutputFormat.setOutputPath(job, new Path(outputPath));
-   // FileOutputFormat.setCompressOutput(job, false);
-    FileOutputFormat.setCompressOutput(job, true);
+    FileOutputFormat.setCompressOutput(job, false);
+   // FileOutputFormat.setCompressOutput(job, true);
 
     
     // Set which InputFormat class to use.
