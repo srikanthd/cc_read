@@ -1,8 +1,10 @@
 package com.intuit.mapreduce;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Set;
 
 import org.apache.hadoop.io.LongWritable;
@@ -33,6 +35,8 @@ private static final Logger LOG = Logger.getLogger(WebpageProcessor.class);
 private final String _counterGroup = "Custom Mapper Counters";
 
 private final boolean INCLUDE_ANCHOR_TEXT = false;
+
+private final boolean TOP_100_DOMAIN_FLAG = true;
 public void map(Text key, ArcRecord value, OutputCollector<Text, Text> output, Reporter reporter)
   throws IOException {
         //Total number of links pointing to with in page.
@@ -104,7 +108,7 @@ try {
     	
     Element curLinkElem = links.get(k);
     String curLink	= curLinkElem.attr("href");
-    
+       
     //skip links to images.
     if(curLink.endsWith(".jpg"))
     {
@@ -112,15 +116,55 @@ try {
     }
     
     
+    //if top 100 domain flag is set include only links that point to top 100 domain pages.
+    if(TOP_100_DOMAIN_FLAG && !WebPageClassifier.verifyTop100Domain(curLink))
+    {
+    	continue;
+    }
+    
+    
+    
     String curAnchorText = curLinkElem.text();
   
-    String anchorTextMatchesLink = "0";
+     //url matches link#url has three parts#url matches first part#url matches second part#url matches third part
+    String anchorTextMatchesLink = "";
     
+    List<String> urlParts = getURLParts(curLink);
     
     //Track if the anchor text matches the words in the link. 
     if(verifyAnchorTextMatchesStr(curAnchorText,curLink))
     {
-    	anchorTextMatchesLink = "1" ; 
+    	anchorTextMatchesLink += "1" ; 
+    }
+    else
+    {
+    	anchorTextMatchesLink += "0";
+    }
+    
+    
+    //verify if url has three parts.
+    if(urlParts.size()==3)
+    {
+    	//url has three parts
+    	anchorTextMatchesLink += "#1";
+    	
+    	for(int m=0;m<urlParts.size();++m)
+    	{
+    		anchorTextMatchesLink += "#";
+    		if(verifyAnchorTextMatchesStr(curAnchorText,urlParts.get(m)))
+    		{
+    			anchorTextMatchesLink += "1";
+    		}
+    		else
+    		{
+    			anchorTextMatchesLink += "0";
+    		}
+    	}
+    }
+    else
+    {
+    	//url doesnt have 3 parts..so all the parts correspond to zero.
+    	anchorTextMatchesLink += "#0#0#0#0";
     }
     
     //Histogram for word counts of 1,2,3,4,5,>5
@@ -218,8 +262,15 @@ try {
  
  
    String resText = totInBoundLinksExternalDomainPages + "///" +totInBoundLinksInternalDomainPages + "///" + totLinks + "///" + totLinksToExternalDomainPages + "///"
-            + totLinksToSamePage + "///" + totLinkstoPagesBaseDomain + "///" + totLinkstoPagesSubDomain + "///" +  jslinkscnt + "///" + "" + "///" + "0#0#0#0#0#0" + "///" + "0" ;
+            + totLinksToSamePage + "///" + totLinkstoPagesBaseDomain + "///" + totLinkstoPagesSubDomain + "///" +  jslinkscnt + "///" + "" + "///" + "0#0#0#0#0#0" + "///" + "0#0#0#0#0" ;
    
+ //if top 100 domain flag is set include the output in the reducer only if it is the  top 100 domain page.
+   if(TOP_100_DOMAIN_FLAG && !WebPageClassifier.verifyTop100Domain(c_url))
+   {
+	   return;
+   }
+   
+	
    output.collect(new Text(c_url), new Text(resText));
   
   
@@ -317,6 +368,38 @@ public static String getBaseDomain(String url) {
 }
 
 
+//divide the URL into three parts. the first one before "/", the middle part and the last part after the last "/"
+public static List<String> getURLParts(String url)
+{
+	List<String> resList = new ArrayList<String>();
+	
+	int ind0 = url.indexOf("//");
+	
+	int indFirst = -1;
+	
+	if(ind0>=0)
+	{
+		indFirst = url.indexOf("/", ind0+3);
+	}
+	else
+	{
+		indFirst= url.indexOf("/");
+	}
+	
+	
+	int indLast = url.lastIndexOf("/");
+	
+	
+	if(indFirst>=0 && indLast>=0 && indFirst<indLast)
+	{
+		resList.add(url.substring(0,indFirst));
+		resList.add(url.substring(indFirst+1,indLast));
+		resList.add(url.substring(indLast+1));
+	}
+	
+	return resList;
+}
+
 public static void main(String[] args)
 {
 	
@@ -347,7 +430,12 @@ public static void main(String[] args)
 	 boolean res = verifyAnchorTextMatchesStr(anchorText,url);
 	 System.out.println("contains::" + res);
 	 
-	 
+	 url = "news.yahoo.com/sdff456_t-yahoo1";
+	 List<String> resList = getURLParts(url);
+	 for (Iterator iterator = resList.iterator(); iterator.hasNext();) {
+		String str = (String) iterator.next();
+		System.out.println(str);
+	}
 	 
 	 
 }
