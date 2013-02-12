@@ -47,6 +47,7 @@ import org.apache.hadoop.mapred.lib.LongSumReducer;
 import org.apache.hadoop.util.Progressable;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
+import org.apache.hadoop.mapreduce.Job;
 
 // Common Crawl classes
 import org.commoncrawl.hadoop.mapred.ArcInputFormat;
@@ -57,6 +58,8 @@ import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
+
+import com.intuit.util.FileUtil;
 
 /**
  * Main class to run the mapreduce job for processing the arc.gz files as "Arc Records"
@@ -191,6 +194,11 @@ public class WebpageProcessor
     job.setReducerClass(WebPageProcessorReducer.class);
 
  
+    job.setLong("mapreduce.jobtracker.split.metainfo.maxsize", -1);
+    job.setLong("mapreduce.job.split.metainfo.maxsize", -1);
+    
+    
+    
     
     if (JobClient.runJob(job).isSuccessful())
       return 0;
