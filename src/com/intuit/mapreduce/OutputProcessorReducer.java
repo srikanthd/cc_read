@@ -2,6 +2,8 @@ package com.intuit.mapreduce;
 
 
 import java.io.*;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Set;
@@ -49,8 +51,39 @@ public class OutputProcessorReducer extends Reducer<Text, Text, Text, Text> {
         
         if(key.toString().equals("DOMAIN_NAME") )
         {
-           context.write(new Text("NUM_DOMAINS_PROCESSED"),new Text(String.valueOf(domainNames.size())));
         	
+        	Map<String,String> domainTypeHistogram = new HashMap<String,String>();
+        	
+        	for (Iterator iterator = domainNames.iterator(); iterator.hasNext();) {
+				String curDomain = (String) iterator.next();
+				if(curDomain.length()>4 && curDomain.substring(curDomain.length()-4, curDomain.length()-3).equals("."))
+				{
+					String domainType = curDomain.substring(curDomain.length()-3);
+					//System.out.println(curDomain + "\t" + domainType);
+					//System.out.println("histogram size::" + domainTypeHistogram.size());
+					domainType = domainType.toLowerCase().trim();
+					if(domainTypeHistogram.containsKey(domainType))
+					{
+						String curVal = domainTypeHistogram.get(domainType);
+						curVal = String.valueOf(Long.valueOf(curVal) + 1);
+						domainTypeHistogram.put(domainType, curVal);
+					}
+					else
+					{
+						domainTypeHistogram.put(domainType, "1");
+					}
+					
+				}
+			}
+        	
+           context.write(new Text("NUM_DOMAINS_PROCESSED"),new Text(String.valueOf(domainNames.size())));
+        
+           for (Iterator iterator = domainTypeHistogram.keySet().iterator(); iterator.hasNext();) {
+			String curDomainType = (String) iterator.next();
+	           context.write(new Text("NUM_DOMAINS_PROCESSED_Type_" + curDomainType),new Text(String.valueOf(domainTypeHistogram.get(curDomainType))));
+	           
+           }
+           
         }
         else
         {
