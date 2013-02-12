@@ -17,13 +17,62 @@ public class OutputProcessorMapper extends Mapper<LongWritable, Text, Text, Text
   
 	public int NUM_INBOUND_THRESHOLD =1000;
 	public boolean INBOUND_POPULARITY=false;
+    public boolean VALIDATE_URLS = true;
+    
+    //Validate if URL is in the appropriate format.
+    public boolean validateURL(String url,Context context)
+    {
+    	 String cwurldom = WebPageProcessorMapper.getBaseDomain(url);
+    	 cwurldom = cwurldom.toLowerCase();
+    	 
+    	 if(url.trim().length()==0 || !url.startsWith("http"))
+    	 {
+    		 try {
+ 				context.write(new Text("INVALID_URL_NOISE"), new Text("1"));
+ 			} catch (IOException e) {
+ 				// TODO Auto-generated catch block
+ 				e.printStackTrace();
+ 			} catch (InterruptedException e) {
+ 				// TODO Auto-generated catch block
+ 				e.printStackTrace();
+ 			}
+     		 
+     		return false; 
+    		 
+    		 
+    	 }
 
+    	 if(cwurldom.equals("yoox.com") && url.toLowerCase().indexOf("searchresult")>=0)
+    	 {
+    		 try {
+				context.write(new Text("INVALID_URL_YOOX"), new Text("1"));
+			} catch (IOException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			} catch (InterruptedException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+    		 
+    		return false;
+    	 }
+         
+    	
+    	return true;
+    }
     public void map(LongWritable key, Text value, Context context) throws IOException, InterruptedException {
         try {
             String content = value.toString();
             String fields[] = content.split("\t");
             String curUrl = fields[0];
             String outputStr = fields[1];
+            
+            
+            if(VALIDATE_URLS)
+            {
+            	boolean validUrl = validateURL(curUrl,context);
+            	if(!validUrl) return;
+            }
             
             String outputFields[] = outputStr.split("///",-1);
 
@@ -32,6 +81,7 @@ public class OutputProcessorMapper extends Mapper<LongWritable, Text, Text, Text
             
             String anchorTextWordHistogramStr = outputFields[9];
           
+            String anchorTextMatchesLinkHistogramStr = outputFields[10];
             
             String inboundAnchorTextFields[] = inboundAnchorText.split("\\$#",-1);
             
@@ -55,11 +105,25 @@ public class OutputProcessorMapper extends Mapper<LongWritable, Text, Text, Text
           
             
             //tracking number of domain names.
-      	   //String cwurldom = WebPageProcessorMapper.getBaseDomain(curUrl);
-           // context.write(new Text("DOMAIN_NAME"), new Text(cwurldom.toLowerCase()));
+      	   String cwurldom = WebPageProcessorMapper.getBaseDomain(curUrl);
+      	   cwurldom = cwurldom.toLowerCase();
+           context.write(new Text("DOMAIN_NAME"), new Text(cwurldom.toLowerCase()));
 
+           context.write(new Text("DOMAIN_"  + cwurldom.toLowerCase()), new Text("1"));
 
-      	  
+      	   if(cwurldom.equals("yoox.com") && curUrl.toLowerCase().indexOf("searchresult")>=0)
+      	   {
+      		 context.write(new Text("DOMAIN_"  + cwurldom.toLowerCase() + "_searchresult"), new Text("1"));
+      	   }
+           
+      	   
+      	   if(WebPageClassifier.verifyTop100Domain(curUrl)==false)
+      	   {
+      		 System.out.println("Found invalid url::" + curUrl);  
+      	   }
+      	   
+      	   
+           
             //Computing the histogram of number of words in the inbound anchor text of the current page.
             //Uses the ouput anchor text.
             for(int k=0;k<inboundAnchorTextFields.length;++k)
@@ -94,6 +158,34 @@ public class OutputProcessorMapper extends Mapper<LongWritable, Text, Text, Text
             
             
             
+            String anchorTextMatchesLinkHistogramFields[] = anchorTextMatchesLinkHistogramStr.split("#");
+           if(anchorTextMatchesLinkHistogramFields.length==5)
+           {
+       		context.write(new Text("ANCHOR_TEXT_MATCHES_LINK_COUNT"), new Text(anchorTextMatchesLinkHistogramFields[0]));
+            context.write(new Text("ANCHOR_TEXT_MATCHES_LINK_URL_HAS_THREE_PARTS"), new Text(anchorTextMatchesLinkHistogramFields[1]));
+       		context.write(new Text("ANCHOR_TEXT_MATCHES_LINK_PART_1_COUNT"), new Text(anchorTextMatchesLinkHistogramFields[2]));
+       		context.write(new Text("ANCHOR_TEXT_MATCHES_LINK_PART_2_COUNT"), new Text(anchorTextMatchesLinkHistogramFields[3]));
+       		context.write(new Text("ANCHOR_TEXT_MATCHES_LINK_PART_3_COUNT"), new Text(anchorTextMatchesLinkHistogramFields[4]));
+        	   
+        	}
+           
+           
+            for(int k=0;k<anchorTextWordHistogramFields.length ; ++k)
+            {
+            	if(k<5)
+            	{
+            		context.write(new Text("ANCHOR_TEXT_HISTOGRAM_WORDS_COUNT_" + (k+1)), new Text(anchorTextWordHistogramFields[k]));
+
+            	}
+            	else
+            	{
+            		context.write(new Text("ANCHOR_TEXT_HISTOGRAM_WORDS_COUNT_GREATER_THAN_5"), new Text(anchorTextWordHistogramFields[k]));
+
+            	}
+            	
+            }
+            
+            
             //System.out.println("cur url::" + curUrl);
             //System.out.println("number of fields::" + outputFields.length);
            
@@ -108,7 +200,6 @@ public class OutputProcessorMapper extends Mapper<LongWritable, Text, Text, Text
             context.write(new Text("TOT_LINKS_PAGES_SAME_BASE_DOMAIN"), new Text(outputFields[5]));
             context.write(new Text("TOT_LINKS_PAGES_SAME_SUB_DOMAIN"), new Text(outputFields[6]));
             context.write(new Text("TOT_JS_LINK_CNT"), new Text(outputFields[7]));
-            context.write(new Text("TOT_ANCHOR_TEXT_MATCHES_LINK"), new Text(outputFields[10]));
 
       
          
