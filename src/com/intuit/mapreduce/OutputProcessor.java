@@ -32,13 +32,19 @@ public class OutputProcessor extends Configured implements Tool {
         // job.setCombinerClass(Reduce.class);
         job.setReducerClass(OutputProcessorReducer.class);
 	   
-        //Setting reduce tasks to 1
-        job.setNumReduceTasks(1);
+        //Setting reduce tasks to 6
+        job.setNumReduceTasks(6);
         
         job.setInputFormatClass(TextInputFormat.class);
         job.setOutputFormatClass(TextOutputFormat.class);  
 
-        FileInputFormat.addInputPath(job, new Path(args[0]));
+        
+        String inputPaths[] = args[0].split(",",-1);
+        for(int k=0;k<inputPaths.length; ++k)
+        {
+        	FileInputFormat.addInputPath(job, new Path(inputPaths[k]));
+        }
+        
         FileOutputFormat.setOutputPath(job, new Path(args[1]));
 	  
         job.waitForCompletion(true);
