@@ -30,8 +30,11 @@ implements Reducer<Text, Text, Text, Text>
         String inBoundAnchorText = "";
         
         long anchorTextWordHistogram[] = {0,0,0,0,0,0};
+        long anchorTextMatchesLinkHistogram[] = {0,0,0,0,0};
         String anchorTextWordHistogramStr = "";
         boolean histogramOutput =false;
+        boolean anchorTextMatchesLinkOutput = false;
+        String anchorTextMatchesLinkHistogramStr = "";
         
         // sum all the output variable counts across all the values for the current URL.
         while (iter.hasNext()) {
@@ -72,7 +75,13 @@ implements Reducer<Text, Text, Text, Text>
             //anchor text matches the link.
             if (s.length > 10 && s[10].length()>0) 
             {
-            	anchorTextMatchesLink += Integer.parseInt(s[10]);
+            	
+            	String anchorTextMatchesHistogramFields[] = s[10].split("#",-1);
+            	for(int m=0;m<anchorTextMatchesLinkHistogram.length;++m)
+            	{
+            		anchorTextMatchesLinkHistogram[m] += Long.parseLong(anchorTextMatchesHistogramFields[m]);
+            	}
+            	anchorTextMatchesLinkOutput = true;
 		
             }
             
@@ -92,9 +101,21 @@ implements Reducer<Text, Text, Text, Text>
 		  	
 		}
 		
+		
+		if(anchorTextMatchesLinkOutput)
+		{
+			for(int m=0 ; m<anchorTextMatchesLinkHistogram.length ; ++m)
+			{
+				if(anchorTextMatchesLinkHistogramStr.length()>0) anchorTextMatchesLinkHistogramStr += "#";
+				anchorTextMatchesLinkHistogramStr += String.valueOf(anchorTextMatchesLinkHistogram[m]);
+			}
+		  	
+		}
+		
+		
         output.collect(key,
                 new Text(
-                sum1 + "///" + sum2 + "///" + sum3 + "///" + sum4 + "///" + sum5 + "///" + sum6 + "///" + sum7 + "///" + sum8 + "///" + inBoundAnchorText + "///" + anchorTextWordHistogramStr + "///" + anchorTextMatchesLink ));
+                sum1 + "///" + sum2 + "///" + sum3 + "///" + sum4 + "///" + sum5 + "///" + sum6 + "///" + sum7 + "///" + sum8 + "///" + inBoundAnchorText + "///" + anchorTextWordHistogramStr + "///" + anchorTextMatchesLinkHistogramStr ));
                 
     }
 
