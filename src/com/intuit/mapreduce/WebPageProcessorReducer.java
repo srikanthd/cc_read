@@ -25,14 +25,37 @@ implements Reducer<Text, Text, Text, Text>
 
 {
 	public void reduce(Text key, Iterator<Text> iter, OutputCollector<Text, Text> output, Reporter reporter) throws IOException {
-        long sum1 = 0, sum2 = 0, sum3 = 0, sum4 = 0, sum5 = 0, sum6 = 0 , sum7=0, sum8=0 , anchorTextMatchesLink =0;
+        
+		//if the output is a widget link
+		if(key.toString().startsWith("WIDGET_"))
+		{
+			int res=0;
+			while (iter.hasNext()) {
+		  		 String curStr = iter.next().toString();
+		         res += Integer.parseInt(curStr);
+			 }
+			 output.collect(key,new Text(String.valueOf(res)));
+		                
+		    return;
+		}
+		
+		
+		
+		//if the output is a hyper link
+		long sum1 = 0, sum2 = 0, sum3 = 0, sum4 = 0, sum5 = 0, sum6 = 0 , sum7=0, sum8=0 , anchorTextMatchesLink =0;
         String pageAnchorText = "";
         String inBoundAnchorText = "";
         
         long anchorTextWordHistogram[] = {0,0,0,0,0,0};
         long anchorTextMatchesLinkHistogram[] = {0,0,0,0,0};
+        long linkRelevanceHistogram[] = {0,0,0,0,0,0,0};
+        
+        
         String anchorTextWordHistogramStr = "";
+        
+        String linkRelevanceStr = "";
         boolean histogramOutput =false;
+        boolean linkRelevanceOutput = false;
         boolean anchorTextMatchesLinkOutput = false;
         String anchorTextMatchesLinkHistogramStr = "";
         
@@ -87,6 +110,23 @@ implements Reducer<Text, Text, Text, Text>
             
             
             
+            //anchor text matches the link.
+            if (s.length > 11 && s[11].length()>0) 
+            {
+            	
+            	String linkRelevanceFields[] = s[11].split("#",-1);
+            	for(int m=0;m<linkRelevanceHistogram.length;++m)
+            	{
+            		linkRelevanceHistogram[m] += Long.parseLong(linkRelevanceFields[m]);
+            	}
+            	linkRelevanceOutput = true;
+		
+            }
+            
+            
+            
+            
+            
             }
             
         
@@ -113,9 +153,20 @@ implements Reducer<Text, Text, Text, Text>
 		}
 		
 		
+		if(linkRelevanceOutput)
+		{
+			for(int m=0 ; m<linkRelevanceHistogram.length ; ++m)
+			{
+				if(linkRelevanceStr.length()>0) linkRelevanceStr += "#";
+				linkRelevanceStr += String.valueOf(linkRelevanceHistogram[m]);
+			}
+		  	
+		}
+		
+		
         output.collect(key,
                 new Text(
-                sum1 + "///" + sum2 + "///" + sum3 + "///" + sum4 + "///" + sum5 + "///" + sum6 + "///" + sum7 + "///" + sum8 + "///" + inBoundAnchorText + "///" + anchorTextWordHistogramStr + "///" + anchorTextMatchesLinkHistogramStr ));
+                sum1 + "///" + sum2 + "///" + sum3 + "///" + sum4 + "///" + sum5 + "///" + sum6 + "///" + sum7 + "///" + sum8 + "///" + inBoundAnchorText + "///" + anchorTextWordHistogramStr + "///" + anchorTextMatchesLinkHistogramStr + "///" + linkRelevanceStr));
                 
     }
 
