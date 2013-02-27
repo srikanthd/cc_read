@@ -6,6 +6,7 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
+import java.util.Map;
 
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.Text;
@@ -71,7 +72,6 @@ try {
     return;
   }
 
-  System.out.println(value.getContentType());
   
   //content type of the file we've seen
   reporter.incrCounter(this._counterGroup, "Content Type - "+value.getContentType(), 1);
@@ -85,14 +85,53 @@ try {
   // Get the Document object of the parsed HTML using Jsoup parser.
   Document doc = value.getParsedHTML();
 
+
  
+  Map< String, Integer > docTokenMap = LinkAnalysis.tokenizeHTMLDocument(doc);
+  
+  
+  
   if (doc == null) {
     reporter.incrCounter(this._counterGroup, "Skipped - Unable to Parse HTML", 1);
     return;
   }
+ 
+  
+
+  
   
   //the page URL we are processing in the current step.
   String c_url = value.getURL();
+
+  
+  if(WebpageProcessor.DEBUG)
+  {
+	  System.out.println("Processing webpage URL:" + c_url);
+	  System.out.println("Start HTML");
+	  System.out.println(doc.html());
+	  System.out.println("End HTML");
+  }
+  
+  
+  //Detect widgets
+  String widgetURL = LinkAnalysis.detectWidgets(doc);
+  if(widgetURL.length()>0)
+  {
+	if(TOP_100_DOMAIN_FLAG)
+	 {
+		if(WebPageClassifier.verifyTop100Domain(widgetURL))
+		{
+			
+			output.collect(new Text("WIDGET_" + widgetURL), new Text("1")); 
+		}
+	}
+	else
+	{
+			output.collect(new Text("WIDGET_" + widgetURL), new Text("1"));  
+	}
+  }
+  
+  
   
   //All link elements in the current web page.
   Elements links  = doc.select("a[href]"); 
@@ -101,7 +140,14 @@ try {
     
   String cwurlhost = getHost(c_url);
   String cwurldom = getBaseDomain(c_url);
-    
+   
+  if(WebpageProcessor.DEBUG)
+  {
+	  System.out.println("cur url host" + cwurlhost);
+	  System.out.println("cur url domain" + cwurldom);
+	  System.out.println("number of links" + links.size());
+  }
+  
   
   for(int k=0;k<links.size(); ++k)
    {
@@ -115,6 +161,8 @@ try {
     	continue;
     }
     
+    if(curLink.trim().length()==0) continue;
+   
     
     //if top 100 domain flag is set include only links that point to top 100 domain pages.
     if(TOP_100_DOMAIN_FLAG && !WebPageClassifier.verifyTop100Domain(curLink))
@@ -122,14 +170,36 @@ try {
     	continue;
     }
     
-    
-    
     String curAnchorText = curLinkElem.text();
-  
+ 
+    
+    String linkRelevanceStr = LinkAnalysis.computePageRelevanceStr(curAnchorText, curLink, docTokenMap);
+    
+    if(WebpageProcessor.DEBUG)
+    {
+  	  System.out.println("cur link" + curLink);
+  	  System.out.println("anchor text" + curAnchorText);
+  	  System.out.println("link relevance str::" + linkRelevanceStr);
+    }
+    
+    
+    
+    
+    
      //url matches link#url has three parts#url matches first part#url matches second part#url matches third part
     String anchorTextMatchesLink = "";
     
     List<String> urlParts = getURLParts(curLink);
+    
+    if(WebpageProcessor.DEBUG)
+    {
+    	for(int m=0;m<urlParts.size() ; ++m)
+    	{
+    		System.out.println("URL Part " + k + "\t" + urlParts.get(m));
+    	}
+    }
+    
+    
     
     //Track if the anchor text matches the words in the link. 
     if(verifyAnchorTextMatchesStr(curAnchorText,curLink))
@@ -161,8 +231,39 @@ try {
     		}
     	}
     }
-    else
+    else if(urlParts.size()==2)  //if there are two parts , assume middle part as empty and use the second part as last part.
     {
+    	//url has three parts
+    	anchorTextMatchesLink += "#1";
+    	
+    	//first part
+    	anchorTextMatchesLink += "#";
+    	if(verifyAnchorTextMatchesStr(curAnchorText,urlParts.get(0)))
+    	{
+    		anchorTextMatchesLink += "1";
+    	}
+    	else
+    	{
+    		anchorTextMatchesLink += "0";
+    	}
+    
+    
+    	//middle part is empty
+    	anchorTextMatchesLink += "#0";
+
+    	//third part
+    	anchorTextMatchesLink += "#";
+    	if(verifyAnchorTextMatchesStr(curAnchorText,urlParts.get(1)))
+    	{
+    		anchorTextMatchesLink += "1";
+    	}
+    	else
+    	{
+    		anchorTextMatchesLink += "0";
+    	}
+    	  
+    }
+    else {
     	//url doesnt have 3 parts..so all the parts correspond to zero.
     	anchorTextMatchesLink += "#0#0#0#0";
     }
@@ -237,8 +338,12 @@ try {
             	totLinksToExternalDomainPages++;
             	
             	//increment the count of "inbound" link from the current page to the external webpage.
-            	String resLinkText = "1///0///0///0///0///0///0///0///" + curAnchorTextOutput + "///" +  curAnchorTextWordHistogramStr + "///" + anchorTextMatchesLink ;
+            	String resLinkText = "1///0///0///0///0///0///0///0///" + curAnchorTextOutput + "///" +  curAnchorTextWordHistogramStr + "///" + anchorTextMatchesLink + "///" + linkRelevanceStr ;
             	
+            	if(WebpageProcessor.DEBUG)
+            	{
+            		System.out.println(curLink + "\t" + resLinkText);
+            	}
                 output.collect(new Text(curLink), new Text(resLinkText));
             }
         
@@ -247,7 +352,12 @@ try {
         if (curLink.startsWith("http:") && (internalLink)) {
         	
         	//increment the count of "inbound" link from the current page to the internal webpage.
-        	String resLinkText = "0///1///0///0///0///0///0///0///" + curAnchorTextOutput + "///" + curAnchorTextWordHistogramStr  + "///" + anchorTextMatchesLink;
+        	String resLinkText = "0///1///0///0///0///0///0///0///" + curAnchorTextOutput + "///" + curAnchorTextWordHistogramStr  + "///" + anchorTextMatchesLink + "///" + linkRelevanceStr;
+        	
+        	if(WebpageProcessor.DEBUG)
+        	{
+        		System.out.println(curLink + "\t" + resLinkText);
+        	}
         	
             output.collect(new Text(curLink), new Text(resLinkText));
         }
@@ -262,7 +372,7 @@ try {
  
  
    String resText = totInBoundLinksExternalDomainPages + "///" +totInBoundLinksInternalDomainPages + "///" + totLinks + "///" + totLinksToExternalDomainPages + "///"
-            + totLinksToSamePage + "///" + totLinkstoPagesBaseDomain + "///" + totLinkstoPagesSubDomain + "///" +  jslinkscnt + "///" + "" + "///" + "0#0#0#0#0#0" + "///" + "0#0#0#0#0" ;
+            + totLinksToSamePage + "///" + totLinkstoPagesBaseDomain + "///" + totLinkstoPagesSubDomain + "///" +  jslinkscnt + "///" + "" + "///" + "0#0#0#0#0#0" + "///" + "0#0#0#0#0" + "///" + "0#0#0#0#0#0#0" ;
    
  //if top 100 domain flag is set include the output in the reducer only if it is the  top 100 domain page.
    if(TOP_100_DOMAIN_FLAG && !WebPageClassifier.verifyTop100Domain(c_url))
@@ -270,7 +380,11 @@ try {
 	   return;
    }
    
-	
+
+   if(WebpageProcessor.DEBUG)
+	{
+		System.out.println(c_url + "\t" + resText);
+	}
    output.collect(new Text(c_url), new Text(resText));
   
   
@@ -317,11 +431,19 @@ public static boolean verifyAnchorTextMatchesStr(String anchorText, String title
 		
 		if(!titleSet.contains(anchorTextFields[k]))
 		{
+			if(WebpageProcessor.DEBUG)
+			{
+				System.out.println("verifying anchor text:" + anchorText + "\tmatches\t" + title + "\t" + "false");
+			}
+			
 			return false;
 		}
 	}
 	
-	
+	if(WebpageProcessor.DEBUG)
+	{
+		System.out.println("verifying anchor text:" + anchorText + "\tmatches\t" + title + "\t" + res);
+	}
 	return res;
 	
 }
