@@ -65,6 +65,20 @@ public class OutputProcessorMapper extends Mapper<LongWritable, Text, Text, Text
             String content = value.toString();
             String fields[] = content.split("\t");
             String curUrl = fields[0];
+            
+            
+            //if the output is a widget URL. extract the domain name and output the widget measure.
+            if(curUrl.startsWith("WIDGET_"))
+            {
+            	String widgetURL = curUrl.substring(7);
+            	String widgetDomain = WebPageProcessorMapper.getBaseDomain(widgetURL);
+            	context.write(new Text(widgetDomain + "_WIDGET"), new Text("1"));
+            	return;
+            }
+            
+            
+            //if the output is a regular URL continue the output analysis.
+            
             String outputStr = fields[1];
             
             
@@ -82,6 +96,8 @@ public class OutputProcessorMapper extends Mapper<LongWritable, Text, Text, Text
             String anchorTextWordHistogramStr = outputFields[9];
           
             String anchorTextMatchesLinkHistogramStr = outputFields[10];
+            
+            String linkRelevanceStr = outputFields[11];
             
             String inboundAnchorTextFields[] = inboundAnchorText.split("\\$#",-1);
             
@@ -135,6 +151,7 @@ public class OutputProcessorMapper extends Mapper<LongWritable, Text, Text, Text
             		avgInboundAnchorWords += words.length;
             		String keyName = "ANCHOR_TEXT_WORD_COUNT_" + words.length; 
             		context.write(new Text(keyName), new Text("1"));
+            		context.write(new Text(cwurldom+"_"+keyName), new Text("1"));
             	}
             }
             
@@ -146,12 +163,12 @@ public class OutputProcessorMapper extends Mapper<LongWritable, Text, Text, Text
             	if(k<5)
             	{
             		context.write(new Text("ANCHOR_TEXT_HISTOGRAM_WORDS_COUNT_" + (k+1)), new Text(anchorTextWordHistogramFields[k]));
-
+            		context.write(new Text(cwurldom+"_"+"ANCHOR_TEXT_HISTOGRAM_WORDS_COUNT_" + (k+1)), new Text(anchorTextWordHistogramFields[k]));
             	}
             	else
             	{
             		context.write(new Text("ANCHOR_TEXT_HISTOGRAM_WORDS_COUNT_GREATER_THAN_5"), new Text(anchorTextWordHistogramFields[k]));
-
+            		context.write(new Text(cwurldom+ "_" + "ANCHOR_TEXT_HISTOGRAM_WORDS_COUNT_GREATER_THAN_5"), new Text(anchorTextWordHistogramFields[k]));
             	}
             	
             }
@@ -166,29 +183,50 @@ public class OutputProcessorMapper extends Mapper<LongWritable, Text, Text, Text
        		context.write(new Text("ANCHOR_TEXT_MATCHES_LINK_PART_1_COUNT"), new Text(anchorTextMatchesLinkHistogramFields[2]));
        		context.write(new Text("ANCHOR_TEXT_MATCHES_LINK_PART_2_COUNT"), new Text(anchorTextMatchesLinkHistogramFields[3]));
        		context.write(new Text("ANCHOR_TEXT_MATCHES_LINK_PART_3_COUNT"), new Text(anchorTextMatchesLinkHistogramFields[4]));
+       		
+       		
+       		context.write(new Text(cwurldom + "_" + "ANCHOR_TEXT_MATCHES_LINK_COUNT"), new Text(anchorTextMatchesLinkHistogramFields[0]));
+            context.write(new Text(cwurldom + "_" + "ANCHOR_TEXT_MATCHES_LINK_URL_HAS_THREE_PARTS"), new Text(anchorTextMatchesLinkHistogramFields[1]));
+       		context.write(new Text(cwurldom + "_" + "ANCHOR_TEXT_MATCHES_LINK_PART_1_COUNT"), new Text(anchorTextMatchesLinkHistogramFields[2]));
+       		context.write(new Text(cwurldom + "_" + "ANCHOR_TEXT_MATCHES_LINK_PART_2_COUNT"), new Text(anchorTextMatchesLinkHistogramFields[3]));
+       		context.write(new Text(cwurldom + "_" + "ANCHOR_TEXT_MATCHES_LINK_PART_3_COUNT"), new Text(anchorTextMatchesLinkHistogramFields[4]));
         	   
         	}
            
            
-            for(int k=0;k<anchorTextWordHistogramFields.length ; ++k)
+           
+           //output the link relevance fields.
+            String linkRelevanceFields[] = linkRelevanceStr.split("#");
+            if(linkRelevanceFields.length==7)
             {
-            	if(k<5)
-            	{
-            		context.write(new Text("ANCHOR_TEXT_HISTOGRAM_WORDS_COUNT_" + (k+1)), new Text(anchorTextWordHistogramFields[k]));
-
-            	}
-            	else
-            	{
-            		context.write(new Text("ANCHOR_TEXT_HISTOGRAM_WORDS_COUNT_GREATER_THAN_5"), new Text(anchorTextWordHistogramFields[k]));
-
-            	}
+            	context.write(new Text("LINK_RELEVANCE_ANCHOR_TEXT_COUNT"), new Text(linkRelevanceFields[0]));
+            	context.write(new Text("LINK_RELEVANCE_HYPERLINK_HISTOGRAM_COUNT_1"), new Text(linkRelevanceFields[1]));
+            	context.write(new Text("LINK_RELEVANCE_HYPERLINK_HISTOGRAM_COUNT_2"), new Text(linkRelevanceFields[2]));
+            	context.write(new Text("LINK_RELEVANCE_HYPERLINK_HISTOGRAM_COUNT_3"), new Text(linkRelevanceFields[3]));
+            	context.write(new Text("LINK_RELEVANCE_HYPERLINK_HISTOGRAM_COUNT_4"), new Text(linkRelevanceFields[4]));
+            	context.write(new Text("LINK_RELEVANCE_HYPERLINK_HISTOGRAM_COUNT_5"), new Text(linkRelevanceFields[5]));
+            	context.write(new Text("LINK_RELEVANCE_HYPERLINK_HISTOGRAM_COUNT_GREATER_THAN_5"), new Text(linkRelevanceFields[6]));
+            	
+            	
+            	context.write(new Text(cwurldom + "_" + "LINK_RELEVANCE_ANCHOR_TEXT_COUNT"), new Text(linkRelevanceFields[0]));
+            	context.write(new Text(cwurldom + "_" + "LINK_RELEVANCE_HYPERLINK_HISTOGRAM_COUNT_1"), new Text(linkRelevanceFields[1]));
+            	context.write(new Text(cwurldom + "_" + "LINK_RELEVANCE_HYPERLINK_HISTOGRAM_COUNT_2"), new Text(linkRelevanceFields[2]));
+            	context.write(new Text(cwurldom + "_" + "LINK_RELEVANCE_HYPERLINK_HISTOGRAM_COUNT_3"), new Text(linkRelevanceFields[3]));
+            	context.write(new Text(cwurldom + "_" + "LINK_RELEVANCE_HYPERLINK_HISTOGRAM_COUNT_4"), new Text(linkRelevanceFields[4]));
+            	context.write(new Text(cwurldom + "_" + "LINK_RELEVANCE_HYPERLINK_HISTOGRAM_COUNT_5"), new Text(linkRelevanceFields[5]));
+            	context.write(new Text(cwurldom + "_" + "LINK_RELEVANCE_HYPERLINK_HISTOGRAM_COUNT_GREATER_THAN_5"), new Text(linkRelevanceFields[6]));
+            	
             	
             }
+    
             
             
             //System.out.println("cur url::" + curUrl);
             //System.out.println("number of fields::" + outputFields.length);
            
+            
+            //output rest of the stats into the reduce step.
+            
             context.write(new Text("NUMBER_OF_WEBPAGES"), new Text("1"));
             
               
@@ -202,6 +240,19 @@ public class OutputProcessorMapper extends Mapper<LongWritable, Text, Text, Text
             context.write(new Text("TOT_JS_LINK_CNT"), new Text(outputFields[7]));
 
       
+            
+            context.write(new Text(cwurldom + "_" + "TOT_INBOUND_FROM_EXTERNAL_DOMAIN_PAGES"), new Text(outputFields[0]));
+            context.write(new Text(cwurldom + "_" + "TOT_INBOUND_FROM_INTERNAL_DOMAIN_PAGES"), new Text(outputFields[1]));
+            context.write(new Text(cwurldom + "_" + "TOT_LINKS"), new Text(outputFields[2]));
+            context.write(new Text(cwurldom + "_" + "TOT_LINKS_TO_EXTERNAL_DOMAIN_PAGES"), new Text(outputFields[3]));
+            context.write(new Text(cwurldom + "_" + "TOT_LINKS_TO_SAME_PAGE"), new Text(outputFields[4]));
+            context.write(new Text(cwurldom + "_" + "TOT_LINKS_PAGES_SAME_BASE_DOMAIN"), new Text(outputFields[5]));
+            context.write(new Text(cwurldom + "_" + "TOT_LINKS_PAGES_SAME_SUB_DOMAIN"), new Text(outputFields[6]));
+            context.write(new Text(cwurldom + "_" + "TOT_JS_LINK_CNT"), new Text(outputFields[7]));
+            
+            
+            
+            
          
             
           //output only if it is non-zero
@@ -210,6 +261,7 @@ public class OutputProcessorMapper extends Mapper<LongWritable, Text, Text, Text
             	
             	avgInboundAnchorWords = avgInboundAnchorWords/inboundAnchorTextFields.length;
             	context.write(new Text("AVG_INBOUND_ANCHOR_TEXT_WORDS_CNT"), new Text(String.valueOf(avgInboundAnchorWords)));
+            	context.write(new Text(cwurldom + "_" + "AVG_INBOUND_ANCHOR_TEXT_WORDS_CNT"), new Text(String.valueOf(avgInboundAnchorWords)));
             }
             
             
@@ -218,6 +270,8 @@ public class OutputProcessorMapper extends Mapper<LongWritable, Text, Text, Text
             if(curUrl.indexOf("-")>=0)
             {
                 context.write(new Text("NUM_HYPHEN_URLS"), new Text("1"));
+                
+                context.write(new Text(cwurldom + "_" + "NUM_HYPHEN_URLS"), new Text("1"));
 
             }
            
@@ -226,6 +280,7 @@ public class OutputProcessorMapper extends Mapper<LongWritable, Text, Text, Text
             {
                 context.write(new Text("NUM_UNDERSCORE_URLS"), new Text("1"));
 
+                context.write(new Text(cwurldom + "_" + "NUM_UNDERSCORE_URLS"), new Text("1"));
             }
             
                    
