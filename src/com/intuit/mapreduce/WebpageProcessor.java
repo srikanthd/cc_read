@@ -69,7 +69,7 @@ public class WebpageProcessor
     implements Tool {
 
   private static final Logger LOG = Logger.getLogger(WebpageProcessor.class);
-
+  public static final boolean DEBUG = false;
 
  
   /**
@@ -137,6 +137,14 @@ public class WebpageProcessor
     job.setMaxMapAttempts(1);
     job.setMaxReduceTaskFailuresPercent(50);
     job.setMaxReduceAttempts(1);
+    
+    
+      if(WebpageProcessor.DEBUG)
+      {
+    	  job.setNumMapTasks(1);
+    	  job.setNumReduceTasks(1);
+      }
+    
     
     long MAX_JOBCONF_SIZE = 10*1024*1024L;
     job.setLong(JobTracker.MAX_USER_JOBCONF_SIZE_KEY, MAX_JOBCONF_SIZE);
